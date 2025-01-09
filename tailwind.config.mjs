@@ -11,6 +11,11 @@ export default {
         background: "var(--background)",
         foreground: "var(--foreground)",
       },
+      fontFamily: {
+        // ... 其他字体
+        'open-sans': ['var(--font-family-open-sans)'],
+        'lora': ['var(--font-family-lora)'],
+      },
     },
   },
   plugins: [],

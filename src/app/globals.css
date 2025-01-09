@@ -1,20 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&family=Lora:wght@400;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* ... 其他字体变量 */
+
+  /* 设置 Open Sans 和 Lora */
+  --font-family-open-sans: 'Open Sans', sans-serif;
+  --font-family-lora: 'Lora', serif;
+
+  /* 默认字体 */
+  --font-family-base: var(--font-family-open-sans); /* 正文字体 */
+  --font-family-secondary: var(--font-family-lora); /* 标题字体 */
+}
 /* 你可以在这里添加一些全局样式，或者覆盖 Tailwind CSS 的默认样式 */
 body {
   background-color: #f5f5f5;
 }
 
-.image-container img{
+.image-wrapper{
   display:block;
   max-width:100%;
 }
 
 @media (min-width: 1280px) {
-  .image-container img{
+  .image-wrapper{
       max-width: 60%;
       scrollbar-width: 10px;
   }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+      opacity: 1;
+  }
+  50% {
+      opacity: 0.5;
+  }
+}
+
+/* Chrome, Edge, and Safari */
+.scrollbar-modern::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scrollbar-modern::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.scrollbar-modern::-webkit-scrollbar-thumb {
+  background-color: #888;
+  border-radius: 5px;
+  border: 2px solid #f1f1f1;
+}
+
+.scrollbar-modern::-webkit-scrollbar-thumb:hover {
+  background-color: #555;
+}
+
+/* Firefox */
+.scrollbar-modern {
+  scrollbar-width: thin;
+  scrollbar-color: #888 #f1f1f1;
+}
+
+.image-wrapper:hover .overlay {
+  opacity: 1;
 }
