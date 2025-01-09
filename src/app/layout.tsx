@@ -15,12 +15,12 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body>
         <div className="container mx-auto p-4">
-          <header className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-gray-800">URL Image Stitching App</h1>
+          <header className="text-center pb-4 border-b-2 border-gray-200">
+            <h1 className="text-4xl font-bold text-gray-800">图片拼接</h1>
           </header>
           <main>{children}</main>
           <footer className="text-center mt-8 pt-8 border-t border-gray-200">
-            <p>&copy; {new Date().getFullYear()} Your Name</p>
+            <p>&copy; {new Date().getFullYear()} 理型健</p>
           </footer>
         </div>
       </body>
