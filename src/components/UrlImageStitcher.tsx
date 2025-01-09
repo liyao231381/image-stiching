@@ -203,9 +203,21 @@ const UrlImageStitcher: React.FC = () => {
     }, [isDragging, startX, startY, handleMouseMove]);
 
     const handleDownloadImage = (imageUrl: string) => {
+        const now = new Date();
+        const year = now.getFullYear().toString().slice(-2); // 获取年份的后两位
+        const month = (now.getMonth() + 1).toString().padStart(2, '0'); // 月份从 0 开始，所以要 +1，并确保是两位数
+        const day = now.getDate().toString().padStart(2, '0'); // 确保日期是两位数
+        const date = `${year}${month}${day}`;
+        const hours = now.getHours().toString().padStart(2, '0'); // 确保小时是两位数
+        const minutes = now.getMinutes().toString().padStart(2, '0'); // 确保分钟是两位数
+        const time = `${hours}${minutes}`;
+        // 获取当前图片在 validImages 数组中的索引
+        const validImages = images.filter((img) => img !== null) as string[];
+        const index = validImages.indexOf(imageUrl);
+
         const link = document.createElement('a');
         link.href = imageUrl;
-        link.download = ''; // You can specify a filename here if needed
+        link.download = `${customFilename}${date}${time}-${index + 1}.png`; // 文件名格式：自定义文件名-日期-时间-序号.png
         link.style.display = 'none';
         document.body.appendChild(link);
         link.click();
