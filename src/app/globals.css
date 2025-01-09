@@ -36,14 +36,23 @@ body {
 }
 
 @keyframes pulse {
-  0%,
-  100% {
-      opacity: 1;
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.2);
+    background-color: #e2e8f0; /* 浅蓝色 */
   }
   50% {
-      opacity: 0.5;
+    opacity: 0.5;
+    box-shadow: 0 0 0 5px rgba(0, 0, 0, 0);
+    background-color: #90cdf4; /* 亮蓝色 */
+  }
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.2);
+    background-color: #e2e8f0; /* 还原为浅蓝色 */
   }
 }
+
 
 /* Chrome, Edge, and Safari */
 .scrollbar-modern::-webkit-scrollbar {
