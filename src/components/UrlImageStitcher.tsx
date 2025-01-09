@@ -8,7 +8,6 @@ const UrlImageStitcher: React.FC = () => {
     const previewContainerRef = useRef<HTMLDivElement>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [imageWidth, setImageWidth] = useState<number>(300);
-    const [preLoadImages, setPreLoadImages] = useState<string[]>([])
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [startX, setStartX] = useState<number>(0);
     const [startY, setStartY] = useState<number>(0);
@@ -21,37 +20,25 @@ const UrlImageStitcher: React.FC = () => {
 
     const fetchImages = async () => {
         setIsLoading(true);
+        setImages([]); // Clear the images array before fetching new images
         try {
             const response = await fetch(`/api/fetch-images?url=${encodeURIComponent(url)}`);
             if (!response.ok) {
                 throw new Error('Failed to fetch images');
             }
             const data = await response.json();
-            setPreLoadImages(data.images);
-            setImages([])
+
+            // Load and filter images based on resolution
+            const loadedImages = await Promise.all(data.images.map(handleImageLoad));
+            const validImages = loadedImages.filter(img => img !== null) as { url: string, width: number, height: number }[];
+            const filteredImages = validImages.filter(img => img.width >= 200 && img.height >= 200);
+            setImages(filteredImages.map(img => img.url)); // Update images array with URLs of filtered images
         } catch (error) {
             console.error(error);
-            // Handle error appropriately
         } finally {
             setIsLoading(false);
         }
     };
-      useEffect(()=>{
-        const fetchAllImage=async ()=>{
-            if(preLoadImages.length === 0 ) return;
-            setIsLoading(true);
-            try{
-                const fetchedImage = await Promise.all(preLoadImages.map(handleImageLoad))
-                setImages(fetchedImage)
-
-            }catch (e) {
-                console.error(e)
-            }finally {
-                setIsLoading(false)
-            }
-        }
-        fetchAllImage()
-    }, [preLoadImages])
 
     const handleDownload = async () => {
         if (!previewContainerRef.current) {
@@ -66,45 +53,43 @@ const UrlImageStitcher: React.FC = () => {
             return;
         }
 
-        const previewImages = Array.from(previewContainerRef.current.children) as HTMLImageElement[];
-
-        if (previewImages.length === 0) {
-            console.error('No images found in the preview container.');
+        // Use the 'images' state directly, which contains the filtered image URLs
+        if (images.length === 0) {
+            console.error('No images to stitch.');
             return;
         }
 
-        // 获取原始图片的尺寸
-        const originalImageSizes = await Promise.all(previewImages.map(img => {
-            return new Promise<{width: number, height: number}>((resolve,reject)=>{
-                const tempImage = new Image()
-                tempImage.src = img.src;
-                tempImage.onload=()=>{
-                    resolve({width:tempImage.naturalWidth,height: tempImage.naturalHeight})
-                }
-                tempImage.onerror=reject
-            })
+        // Create temporary image elements to get the dimensions
+        const tempImages = await Promise.all(images.map(imageUrl => {
+            return new Promise<HTMLImageElement>((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = imageUrl;
+            });
+        }));
 
-        }))
+        // Get the original dimensions of the images
+        const originalImageSizes = tempImages.map(img => ({
+            width: img.naturalWidth,
+            height: img.naturalHeight
+        }));
 
-        // 计算 canvas 的宽度和高度
+        // Calculate canvas width and height
         const canvasWidth = imageWidth;
-        const canvasHeight = previewImages.reduce((sum, img, index) => sum + (imageWidth / originalImageSizes[index].width) * originalImageSizes[index].height, 0);
+        const canvasHeight = originalImageSizes.reduce((sum, size) => sum + (imageWidth / size.width) * size.height, 0);
         canvas.width = canvasWidth;
         canvas.height = canvasHeight;
 
-
         let yOffset = 0;
-        for (let i = 0; i < previewImages.length; i++) {
-            const img = previewImages[i];
-            // 获取原始图片的宽高
+        for (let i = 0; i < tempImages.length; i++) {
+            const img = tempImages[i];
             const originalWidth = originalImageSizes[i].width;
             const originalHeight = originalImageSizes[i].height;
-            // 计算缩放比例
             const scale = imageWidth / originalWidth;
             ctx.drawImage(img, 0, yOffset, imageWidth, originalHeight * scale);
             yOffset += originalHeight * scale;
         }
-
 
         canvas.toBlob((blob) => {
             if (blob) {
@@ -122,23 +107,34 @@ const UrlImageStitcher: React.FC = () => {
         }, 'image/png');
     };
 
-    const handleImageLoad = async (imageUrl: string): Promise<string> => {
+    const handleImageLoad = async (imageUrl: string): Promise<{ url: string, width: number, height: number } | null> => {
+        // Return object with URL and dimensions, or null if failed
         const proxyImageUrl = new URL('/api/proxy-image', window.location.origin);
         proxyImageUrl.searchParams.set('url', imageUrl);
         try {
             const response = await fetch(proxyImageUrl.toString());
-            if(!response.ok){
-            throw new Error(`Failed to fetch image ${imageUrl} with ${response.status}`)
-           }
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-            return url;
+            if (!response.ok) {
+                throw new Error(`Failed to fetch image ${imageUrl} with ${response.status}`);
+            }
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    resolve({ url: blobUrl, width: img.naturalWidth, height: img.naturalHeight });
+                };
+                img.onerror = () => {
+                    console.error("Error loading image:", imageUrl);
+                    resolve(null); // Resolve with null for failed images
+                };
+                img.src = blobUrl;
+            });
         } catch (error) {
             console.error("Error loading image:", imageUrl, error);
-             throw error;
+            return null;
         }
     };
-
 
     const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
           event.preventDefault();
@@ -147,7 +143,6 @@ const UrlImageStitcher: React.FC = () => {
                    previewContainerRef.current.scrollTop += deltaY
                }
     };
-
 
     const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
         setIsDragging(true);
@@ -212,7 +207,7 @@ const UrlImageStitcher: React.FC = () => {
                 {/* 图片宽度控制和下载按钮 */}
                 <div className="flex flex-col items-center mb-4">
                     <div className="flex flex-col md:flex-row lg:flex-row items-center mb-2 md:mb-0 md:mr-2 w-full md:w-auto">
-                        <label htmlFor="image-width" className='block mb-1'>宽度：</label>
+                        <label htmlFor="image-width" className='block mb-1 w-20 font-bold text-gray-800'>宽度：</label>
                         <input
                             type="number"
                             id="image-width"
@@ -220,7 +215,7 @@ const UrlImageStitcher: React.FC = () => {
                             max="1000"
                             value={imageWidth}
                             onChange={(e) => setImageWidth(parseInt(e.target.value))}
-                            className="border border-gray-300 px-2 py-1 rounded w-full md:w-auto"
+                            className="border border-gray-300 px-2 py-1 rounded w-full md:w-full"
                          />
                     </div>
                          {images.length > 0 && (
@@ -249,25 +244,10 @@ const UrlImageStitcher: React.FC = () => {
                             key={index}
                             src={imageUrl}
                             alt={`Preview ${index}`}
+                             style={{ width: `${imageWidth}px` }}
                         />
                     ))}
               </div>
-                {/* 图片预加载 */}
-              {!isLoading && images.length > 0 &&
-            <div style={{display: 'none'}}>
-              {
-                images.map((imageUrl,index)=>(
-                 <img
-                   key={index}
-                    src={imageUrl}
-                   alt={`Preview ${index}`}
-                   onLoad={() => {
-                   }}
-                 />
-                ))
-               }
-            </div>
-        }
         </div>
     );
 };
