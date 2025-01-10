@@ -407,7 +407,7 @@ const UrlImageStitcher: React.FC = () => {
                       ) : (
                         <div
                           className="animate-pulse bg-gray-300 relative flex items-center justify-center"
-                          style={{ width: '100%', height: `${imageWidth}px` }}
+                          style={{ width: '100%', height: `50px` }}
                         >
                           <ClipLoader color="#4A90E2" loading={true} size={35} />
                           <div className="overlay absolute top-0 left-0 w-full h-full flex justify-between p-1 hover:opacity-100 transition-opacity duration-200">
