@@ -22,99 +22,98 @@ const UrlImageStitcher: React.FC = () => {
     setUrl(event.target.value);
   };
 
-  // 获取图片
   const fetchImages = async () => {
-    setIsLoading(true); // 开始加载图片，设置加载状态为 true
-    setImages([]); // 清空之前的图片数组
+    setIsLoading(true);
+    setImages([]);
     try {
-      // 发送请求到 /api/fetch-images 接口，获取图片 URL
       const response = await fetch(`/api/fetch-images?url=${encodeURIComponent(url)}`);
       if (!response.ok) {
         throw new Error('获取图片失败');
       }
       const data = await response.json();
       const imageUrls = data.images;
-
-      // 将 images 数组初始化为与 imageUrls 数组长度相同的 null 数组
-      setImages(imageUrls.map(() => null));
-
-      // 遍历 imageUrls 数组，加载每一张图片
-      imageUrls.forEach(async (imageUrl: string, index: number) => {
-        const loadedImage = await handleImageLoad(imageUrl);
-        // 如果图片加载成功，并且宽度和高度都大于 200，则更新 images 数组中对应位置的元素
-        if (loadedImage && loadedImage.width >= 200 && loadedImage.height >= 200) {
-          setImages((prevImages) =>
-            prevImages.map((img, i) => (i === index ? loadedImage.url : img))
-          );
-        } else {
-          // 否则，仍然保留 null 占位符
-          setImages((prevImages) => prevImages.map((img, i) => (i === index ? null : img)));
-        }
-      });
+  
+      // 使用 Promise.all 等待所有图片加载完成
+      const loadedImages = await Promise.all(
+        imageUrls.map(async (imageUrl: string) => {
+          const loadedImage = await handleImageLoad(imageUrl);
+          if (loadedImage && loadedImage.width >= 200 && loadedImage.height >= 200) {
+            return loadedImage.url; // 只返回 URL
+          } else {
+            return null; // 加载失败或尺寸不符合要求，返回 null
+          }
+        })
+      );
+  
+      // 更新 images 状态
+      setImages(loadedImages);
     } catch (error) {
       console.error(error);
     } finally {
-      setIsLoading(false); // 加载完成，设置加载状态为 false
+      setIsLoading(false);
     }
   };
-
-  // 处理图片拼接和下载
+  
   const handleDownload = async () => {
-    if (!previewContainerRef.current) {
-      console.error('预览容器引用为空');
-      return;
-    }
-
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       console.error('无法获取 canvas 上下文');
       return;
     }
-
-    // 使用 'images' 状态，其中包含过滤后的图片 URL
+  
+    console.log('images:', images);
+  
     if (images.length === 0) {
       console.error('没有图片可以拼接');
       return;
     }
-
-    // 过滤掉 null 值 (占位符)
-    const validImages = images.filter((img) => img !== null) as string[];
-
+  
     // 创建临时的图片元素来获取图片的尺寸
-    const tempImages = await Promise.all(
-      validImages.map((imageUrl) => {
-        return new Promise<HTMLImageElement>((resolve, reject) => {
+    const tempImages = await Promise.allSettled(
+      images.map((imageUrl) => {
+        return new Promise<HTMLImageElement>((resolve) => {
           const img = new Image();
+          img.crossOrigin = 'anonymous';
           img.onload = () => resolve(img);
-          img.onerror = reject;
+          img.onerror = () => {
+            console.error('图片加载失败:', imageUrl);
+            resolve(null); // 加载失败时，resolve 一个 null 值
+          };
           img.src = imageUrl;
         });
       })
     );
-
+  
+    // 过滤掉加载失败的图片 (fulfilled 状态且 value 不为 null 的)
+    const validTempImages = tempImages
+      .filter((result) => result.status === 'fulfilled' && result.value !== null)
+      .map((result) => (result as PromiseFulfilledResult<HTMLImageElement>).value);
+  
+    console.log('validTempImages:', validTempImages);
+  
     // 获取图片的原始尺寸
-    const originalImageSizes = tempImages.map((img) => ({
+    const originalImageSizes = validTempImages.map((img) => ({
       width: img.naturalWidth,
       height: img.naturalHeight,
     }));
-
+  
     // 计算 canvas 的宽度和高度
     const canvasWidth = imageWidth;
     const canvasHeight = originalImageSizes.reduce((sum, size) => sum + (imageWidth / size.width) * size.height, 0);
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
-
+  
     let yOffset = 0;
-    for (let i = 0; i < tempImages.length; i++) {
-      const img = tempImages[i];
+    for (let i = 0; i < validTempImages.length; i++) {
+      const img = validTempImages[i];
       const originalWidth = originalImageSizes[i].width;
       const originalHeight = originalImageSizes[i].height;
       const scale = imageWidth / originalWidth;
       ctx.drawImage(img, 0, yOffset, imageWidth, originalHeight * scale);
       yOffset += originalHeight * scale;
     }
-
+  
     // 将 canvas 转换为 blob 并下载
     canvas.toBlob(
       (blob) => {
@@ -134,7 +133,7 @@ const UrlImageStitcher: React.FC = () => {
       'image/png'
     );
   };
-
+  
   // 加载图片并返回图片的 URL、宽度和高度
   const handleImageLoad = async (imageUrl: string): Promise<{ url: string, width: number, height: number } | null> => {
     // 返回一个包含 URL 和尺寸的对象，如果失败则返回 null
